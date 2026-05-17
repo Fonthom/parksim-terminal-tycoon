@@ -1,3 +1,4 @@
+from sim.constants import PARK_WIDTH, PARK_HEIGHT
 from dataclasses import dataclass
 
 @dataclass
@@ -20,3 +21,8 @@ class Park:
     
     def to_index(self, row, col):
         pass
+
+def run():
+    park = Park(
+        width=PARK_WIDTH,
+        height=PARK_HEIGHT,)

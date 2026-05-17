@@ -1,5 +1,7 @@
+from sim.park import run
+
 def main():
-    print("Hello from parksim-terminal-tycoon!")
+    run()
 
 
 if __name__ == "__main__":

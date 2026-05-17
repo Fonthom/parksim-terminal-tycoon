@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import Enum, auto
 
 class TileType(Enum):
-    GRASS,
-    PATH,
-    RIDE,
-    STALL,
-    TOILET,
-    ENTRANCE,
+    GRASS = "grass"
+    PATH = "path"
+    RIDE = "ride"
+    STALL = "stall"
+    TOILET = "toilet"
+    ENTRANCE = "entrance"

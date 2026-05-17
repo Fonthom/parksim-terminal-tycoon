@@ -1,14 +1,14 @@
 from dataclasses import dataclass
-from .constants import CASH
+from .constants import STARTING_CASH
 
 @dataclass
 class Finance:
-    cash = CASH
+    cash = STARTING_CASH
     income_per_tick: float = 0.0
-    expenses_per_tick: float = 0.0
+    upkeep_per_tick: float = 0.0
 
     def tick(self):
-        pass
+        self.cash += self.income_per_tick - self.upkeep_per_tick
 
     def is_bankrupt(self):
-        pass
+        return self.cash <= 0.0

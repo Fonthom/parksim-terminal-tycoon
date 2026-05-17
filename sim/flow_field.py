@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from .constants import PARK_WIDTH, PARK_HEIGHT, FLOW_FIELD_INFINITY
 from sim.constants import PARK_WIDTH, PARK_HEIGHT, FLOW_FIELD_INFINITY
 
 @dataclass

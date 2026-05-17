@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .guest_state import GuestState
 from .constants import PARK_WIDTH, PARK_HEIGHT
 import random
@@ -14,3 +14,4 @@ class Guest:
 
     def update(self, park):
         pass
+    

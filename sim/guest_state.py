@@ -1,8 +1,9 @@
-from enum import Enum, auto
+from enum import Enum
 
 class GuestState(Enum):
     WANDERING = "wandering"
     HUNGRY = "hungry"
     QUEUING = "queuing"
     RIDING = "riding"
-    LEAVING = "leaving"
+    EXITING = "exiting"
+    LEFT = "left"

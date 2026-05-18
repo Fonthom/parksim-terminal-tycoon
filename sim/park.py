@@ -25,7 +25,7 @@ class Park:
         self._spawn_guests()
         for guest in self.guests:
             guest.update(self)
-        self.guests = [g for g in self.guests if g.state != GuestState.LEAVING]
+        self.guests = [g for g in self.guests if g.state != GuestState.LEFT]
     
     def get_tile(self, row, col):
         return self.grid[self.to_index(row, col)]

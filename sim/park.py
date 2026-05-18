@@ -32,6 +32,7 @@ class Park:
 
     def set_tile(self, row, col, tile_type):
         self.grid[self.to_index(row, col)] = tile_type
+        self.flow_field.recompute(self.grid)    
     
     def to_index(self, row, col):
         return row * self.width + col

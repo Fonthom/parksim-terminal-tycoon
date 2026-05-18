@@ -3,10 +3,16 @@ from .constants import PARK_WIDTH, PARK_HEIGHT, FLOW_FIELD_INFINITY
 import heapq
 from .tiles import TileType
 
-GOAL_TILES = {TileType.ENTRANCE, TileType.RIDE, TileType.STALL, TileType.TOILET}
-WALKABLE_TILES = {TileType.PATH, TileType.ENTRANCE}
+EXIT_GOAL_TILES = {TileType.ENTRANCE}
+GOAL_TILES = {TileType.RIDE, TileType.STALL, TileType.TOILET}
+WALKABLE_TILES = {TileType.PATH, TileType.ENTRANCE, TileType.RIDE, TileType.STALL, TileType.TOILET}
 NEIGHBOUR_OFFSETS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-
+GOAL_COSTS = {
+    TileType.RIDE:   0,
+    TileType.STALL:  1,
+    TileType.TOILET: 1,
+    TileType.ENTRANCE: 0
+}
 @dataclass
 class FlowField:
     width: int = PARK_WIDTH
@@ -23,23 +29,31 @@ class FlowField:
         return 0 <= row < self.height and 0 <= col < self.width
 
     def recompute(self, grid):
+        self._recompute_with_goals(grid, GOAL_TILES)
+
+    def recompute_for_exit(self, grid):
+        self._recompute_with_goals(grid, EXIT_GOAL_TILES)
+
+    def _recompute_with_goals(self, grid, goals):
         cost = [FLOW_FIELD_INFINITY] * (self.width * self.height)
         directions = [(0, 0)] * (self.width * self.height)
         queue = []
 
-        self._seed_goals(grid, cost, queue)
+        self._seed_goals(grid, cost, queue, goals)
 
         while queue:
             self._process_tile(queue, cost, directions, grid)
 
         self.directions = directions
 
-    def _seed_goals(self, grid, cost, queue):
+    def _seed_goals(self, grid, cost, queue, goals):
         for row in range(self.height):
             for col in range(self.width):
-                if grid[self.to_index(row, col)] in GOAL_TILES:
-                    cost[self.to_index(row, col)] = 0
-                    heapq.heappush(queue, (0, row, col))
+                tile = grid[self.to_index(row, col)]
+                if tile in goals:
+                    goal_cost = GOAL_COSTS.get(tile, 0)
+                    cost[self.to_index(row, col)] = goal_cost
+                    heapq.heappush(queue, (goal_cost, row, col))
 
     def _process_tile(self, queue, cost, directions, grid):
         current_cost, row, col = heapq.heappop(queue)

@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 from .guest_state import GuestState
 from .constants import PARK_WIDTH, PARK_HEIGHT, HUNGER_RATE, HUNGER_THRESHOLD
+from .tiles import TileType
 import random
 
 @dataclass
 class Guest:
-    row: int = PARK_HEIGHT - 1
+    row: int = PARK_HEIGHT - 2
     col: int = PARK_WIDTH // 2
     state: GuestState = GuestState.WANDERING
     hunger: float = field(default_factory=lambda: random.uniform(0.0, 0.3))
@@ -21,10 +22,14 @@ class Guest:
             self._walk_toward_exit(park)
     
     def _wander(self, park):
-        self._move(park)
         self.hunger += HUNGER_RATE
         if self.hunger >= HUNGER_THRESHOLD:
             self.state = GuestState.HUNGRY
+        elif park.get_tile(self.row, self.col) == TileType.RIDE:
+            self.happiness = min(1.0, self.happiness + 0.1)
+            self.state = GuestState.EXITING
+        else:
+            self._move(park)
     
     def _find_food(self, park):
         if self._is_stall_adjacent(park):
@@ -41,10 +46,19 @@ class Guest:
         if park.get_tile(self.row, self.col) == TileType.ENTRANCE:
             self.state = GuestState.LEFT
         else:
-            self._move(park)
+            row_delta, col_delta = park.exit_field.get_direction(self.row, self.col)
+            if (row_delta, col_delta) == (0, 0):
+                return
+            new_row = self.row + row_delta
+            new_col = self.col + col_delta
+            if park.exit_field.is_within_bounds(new_row, new_col):
+                self.row = new_row
+                self.col = new_col
     
     def _move(self, park):
         row_delta, col_delta = park.flow_field.get_direction(self.row, self.col)
+        if (row_delta, col_delta) == (0, 0):
+            return
         new_row = self.row + row_delta
         new_col = self.col + col_delta
         if park.flow_field.is_within_bounds(new_row, new_col):

@@ -1,7 +1,7 @@
-from sim.park import run
+from ui.renderer import start
 
 def main():
-    run()
+    start()
 
 
 if __name__ == "__main__":

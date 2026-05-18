@@ -7,3 +7,4 @@ class TileType(Enum):
     STALL = "stall"
     TOILET = "toilet"
     ENTRANCE = "entrance"
+    GUEST = "guest"

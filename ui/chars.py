@@ -19,6 +19,7 @@ TILE_CHARS = {
 GUEST_CHARS = {
     GuestState.WANDERING: ('@', PAIR_GUEST),
     GuestState.HUNGRY:    ('!', PAIR_HUNGRY),
+    GuestState.NEED_TOILET: ('~', PAIR_EXITING),
     GuestState.EXITING:   ('~', PAIR_EXITING),
     GuestState.LEFT:      (' ', PAIR_GRASS),
 }

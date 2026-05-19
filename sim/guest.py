@@ -1,6 +1,6 @@
 import random
-from .tiles import TileType
 from dataclasses import dataclass, field
+from .tiles import TileType
 from .guest_state import GuestState
 from .constants import (
     PARK_WIDTH, PARK_HEIGHT,
@@ -20,12 +20,10 @@ class Guest:
     money: float = field(default_factory=lambda: random.uniform(20.0, 80.0))
     bladder: float = field(default_factory=lambda: random.uniform(0.0, 0.2))
     bladder_rate: float = BLADDER_RATE
-    visited_rides: set[tuple[int, int]] = field(default_factory=set)
-    recent_visits: dict[tuple[int, int], int] = field(default_factory=dict)
-    post_visit_timer: int = 0
+    visited_rides: set = field(default_factory=set)
+    target: tuple = field(default=None)
 
     def update(self, park):
-        self._countdown_recent_visits()
         if self.state == GuestState.WANDERING:
             self._wander(park)
         elif self.state == GuestState.HUNGRY:
@@ -34,6 +32,8 @@ class Guest:
             self._find_toilet(park)
         elif self.state == GuestState.EXITING:
             self._walk_toward_exit(park)
+
+    # --- needs ---
 
     def _tick_needs(self):
         self.hunger += HUNGER_RATE
@@ -47,40 +47,13 @@ class Guest:
     def _check_should_exit(self):
         if self.money <= 0 or self.happiness <= HAPPINESS_EXIT_THRESHOLD:
             self.state = GuestState.EXITING
+            self.target = None
             return True
         return False
 
-    def _countdown_recent_visits(self):
-        expired = []
-        for pos, timer in list(self.recent_visits.items()):
-            timer -= 1
-            if timer <= 0:
-                expired.append(pos)
-            else:
-                self.recent_visits[pos] = timer
-        for pos in expired:
-            del self.recent_visits[pos]
-
-    def _mark_recent_visit(self, pos: tuple[int, int]):
-        self.recent_visits[pos] = random.randint(20, 30)
-
-    def _start_post_visit_wander(self):
-        self.post_visit_timer = random.randint(8, 12)
+    # --- states ---
 
     def _wander(self, park):
-        if self.post_visit_timer > 0:
-            self._tick_needs()
-            self._check_bladder_accident()
-
-            if self._check_should_exit():
-                return
-
-            self._move_random(park)
-            self.post_visit_timer -= 1
-            if self.post_visit_timer == 0 and self.bladder >= BLADDER_THRESHOLD:
-                self.state = GuestState.NEED_TOILET
-            return
-
         self._tick_needs()
         self._check_bladder_accident()
 
@@ -88,46 +61,39 @@ class Guest:
             return
         if self.bladder >= BLADDER_THRESHOLD:
             self.state = GuestState.NEED_TOILET
+            self.target = None
             return
         if self.hunger >= HUNGER_THRESHOLD:
             self.state = GuestState.HUNGRY
+            self.target = None
             return
 
-        if random.random() < 0.3:
-            self._move_random(park)
-            return
+        if self.target is None or self.target in self.visited_rides:
+            self.target = self._pick_ride_target(park)
 
         ride_pos = self._find_adjacent_facility(park, TileType.RIDE)
         if ride_pos:
             self._ride(park, ride_pos)
+        elif self.target:
+            self._move_toward_target(park, self.target)
         else:
-            self._move(park)
+            self._move_random(park)
 
     def _ride(self, park, ride_pos):
         if self.money < RIDE_COST:
             self.state = GuestState.EXITING
+            self.target = None
             return
         self.money -= RIDE_COST
         self.happiness = min(1.0, self.happiness + 0.2)
         self.visited_rides.add(ride_pos)
-        self._mark_recent_visit(ride_pos)
-        self._start_post_visit_wander()
-    
+        self.target = None
+
     def _find_food(self, park):
-        from .tiles import TileType
         self._tick_needs()
         self._check_bladder_accident()
 
         if self._check_should_exit():
-            return
-
-        if park.get_tile(self.row, self.col) == TileType.STALL:
-            self.hunger = 0.0
-            self.money -= STALL_COST
-            self.bladder_rate = BLADDER_RATE_AFTER_EATING
-            self.state = GuestState.WANDERING
-            self._mark_recent_visit((self.row, self.col))
-            self._start_post_visit_wander()
             return
 
         stall_pos = self._find_adjacent_facility(park, TileType.STALL)
@@ -136,144 +102,106 @@ class Guest:
             self.money -= STALL_COST
             self.bladder_rate = BLADDER_RATE_AFTER_EATING
             self.state = GuestState.WANDERING
-            self._mark_recent_visit(stall_pos)
-            self._start_post_visit_wander()
         else:
             self._move_with_field(park, park.food_field)
 
     def _find_toilet(self, park):
-        from .tiles import TileType
         self._tick_needs()
         self._check_bladder_accident()
 
         if self._check_should_exit():
             return
+
         toilet_pos = self._find_adjacent_facility(park, TileType.TOILET)
         if toilet_pos:
             self.bladder = 0.0
             self.bladder_rate = BLADDER_RATE
             self.state = GuestState.WANDERING
-            self._mark_recent_visit(toilet_pos)
-            self._start_post_visit_wander()
         else:
-            self._move(park)
+            self._move_with_field(park, park.toilet_field)
 
     def _walk_toward_exit(self, park):
-        from .tiles import TileType
         if park.get_tile(self.row, self.col) == TileType.ENTRANCE:
             self.state = GuestState.LEFT
-        else:
-            row_delta, col_delta = park.exit_field.get_direction(self.row, self.col)
-            if (row_delta, col_delta) == (0, 0):
-                return
-            new_row = self.row + row_delta
-            new_col = self.col + col_delta
-            if not self._try_move(park, new_row, new_col):
-                self._move_random(park)
-    
-    def _move(self, park):
-        from .tiles import TileType
-        row_delta, col_delta = park.flow_field.get_direction(self.row, self.col)
-
-        # if flow field points toward a recently visited facility, pick a random walkable neighbour instead
-        next_row = self.row + row_delta
-        next_col = self.col + col_delta
-        if (next_row, next_col) in self.recent_visits:
-            self._move_random(park)
             return
-
+        row_delta, col_delta = park.exit_field.get_direction(self.row, self.col)
         if (row_delta, col_delta) == (0, 0):
-            return
-
-        if not park.is_within_bounds(next_row, next_col):
-            return
-
-        next_tile = park.get_tile(next_row, next_col)
-        if next_tile == TileType.RIDE and (next_row, next_col) in self.visited_rides:
             self._move_random(park)
             return
-        if next_tile not in {TileType.PATH, TileType.ENTRANCE}:
-            self._move_random(park)
-            return
+        new_row = self.row + row_delta
+        new_col = self.col + col_delta
+        if park.is_within_bounds(new_row, new_col):
+            self.row = new_row
+            self.col = new_col
 
-        if not self._try_move(park, next_row, next_col):
-            self._move_random(park)
+    # --- movement ---
 
-    def _move_random(self, park):
-        current_tile = park.get_tile(self.row, self.col)
-        allow_leave_facility = current_tile in {TileType.RIDE, TileType.STALL, TileType.TOILET}
-
-        walkable = []
+    def _move_toward_target(self, park, target):
+        tr, tc = target
+        candidates = []
         for row_delta, col_delta in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            neighbour_row = self.row + row_delta
-            neighbour_col = self.col + col_delta
-            if not park.is_within_bounds(neighbour_row, neighbour_col):
+            nr = self.row + row_delta
+            nc = self.col + col_delta
+            if not park.is_within_bounds(nr, nc):
                 continue
-            tile = park.get_tile(neighbour_row, neighbour_col)
-            if tile not in {TileType.PATH, TileType.ENTRANCE}:
+            if park.get_tile(nr, nc) not in {TileType.PATH, TileType.ENTRANCE}:
                 continue
-            if not allow_leave_facility and self._is_next_to_recently_visited_facility(park, neighbour_row, neighbour_col):
-                continue
-
-            walkable.append((neighbour_row, neighbour_col))
-        if walkable:
-            row, col = random.choice(walkable)
-            self._try_move(park, row, col)
+            dist = abs(nr - tr) + abs(nc - tc)
+            candidates.append((dist, nr, nc))
+        if not candidates:
+            self._move_random(park)
+            return
+        candidates.sort()
+        best_dist = candidates[0][0]
+        best = [c for c in candidates if c[0] == best_dist]
+        _, nr, nc = random.choice(best)
+        self.row = nr
+        self.col = nc
 
     def _move_with_field(self, park, field):
         row_delta, col_delta = field.get_direction(self.row, self.col)
-        next_row = self.row + row_delta
-        next_col = self.col + col_delta
-        if (next_row, next_col) in self.recent_visits:
-            self._move_random(park)
-            return
         if (row_delta, col_delta) == (0, 0):
-            return
-        if not park.is_within_bounds(next_row, next_col):
-            return
-        next_tile = park.get_tile(next_row, next_col)
-        if next_tile == TileType.RIDE and (next_row, next_col) in self.visited_rides:
             self._move_random(park)
             return
-        if next_tile not in {TileType.PATH, TileType.ENTRANCE}:
-            self._move_random(park)
-            return
-        if not self._try_move(park, next_row, next_col):
-            self._move_random(park)
+        new_row = self.row + row_delta
+        new_col = self.col + col_delta
+        if park.is_within_bounds(new_row, new_col):
+            self.row = new_row
+            self.col = new_col
 
-    def _try_move(self, park, row, col):
-        self.row = row
-        self.col = col
-        return True
+    def _move_random(self, park):
+        walkable = []
+        for row_delta, col_delta in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nr = self.row + row_delta
+            nc = self.col + col_delta
+            if not park.is_within_bounds(nr, nc):
+                continue
+            if park.get_tile(nr, nc) in {TileType.PATH, TileType.ENTRANCE}:
+                walkable.append((nr, nc))
+        if walkable:
+            self.row, self.col = random.choice(walkable)
 
-    def _is_next_to_recently_visited_facility(self, park, row, col):
-        for row_delta, col_delta in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            neighbour_row = row + row_delta
-            neighbour_col = col + col_delta
-            if (neighbour_row, neighbour_col) in self.recent_visits:
-                return True
-        return False
+    # --- helpers ---
 
-    def _is_adjacent_to(self, park, tile_type):
+    def _pick_ride_target(self, park) -> tuple | None:
+        unvisited = [
+            (row, col)
+            for row in range(park.height)
+            for col in range(park.width)
+            if park.get_tile(row, col) == TileType.RIDE
+            and (row, col) not in self.visited_rides
+        ]
+        return random.choice(unvisited) if unvisited else None
+
+    def _find_adjacent_facility(self, park, tile_type) -> tuple | None:
         for row_delta, col_delta in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            neighbour_row = self.row + row_delta
-            neighbour_col = self.col + col_delta
-            if park.flow_field.is_within_bounds(neighbour_row, neighbour_col):
-                if park.get_tile(neighbour_row, neighbour_col) == tile_type:
-                    return True
-        return False
-    
-    def _find_adjacent_facility(self, park, tile_type):
-        for row_delta, col_delta in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            neighbour_row = self.row + row_delta
-            neighbour_col = self.col + col_delta
-            if park.flow_field.is_within_bounds(neighbour_row, neighbour_col):
-                if park.get_tile(neighbour_row, neighbour_col) == tile_type:
-                    facility_pos = (neighbour_row, neighbour_col)
-                    if tile_type == TileType.RIDE and facility_pos in self.visited_rides:
-                        continue
-                    if facility_pos not in self.recent_visits:
-                        return facility_pos
+            nr = self.row + row_delta
+            nc = self.col + col_delta
+            if not park.is_within_bounds(nr, nc):
+                continue
+            if park.get_tile(nr, nc) == tile_type:
+                pos = (nr, nc)
+                if tile_type == TileType.RIDE and pos in self.visited_rides:
+                    continue
+                return pos
         return None
-
-    

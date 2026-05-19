@@ -4,9 +4,10 @@ import heapq
 from .tiles import TileType
 
 EXIT_GOAL_TILES = {TileType.ENTRANCE}
-GOAL_TILES = {TileType.RIDE, TileType.STALL, TileType.TOILET}
+GOAL_TILES = {TileType.RIDE}
 FOOD_GOAL_TILES = {TileType.STALL}
-WALKABLE_TILES = {TileType.PATH, TileType.ENTRANCE, TileType.GUEST}
+TOILET_GOAL_TILES = {TileType.TOILET}
+WALKABLE_TILES = {TileType.PATH, TileType.ENTRANCE}
 NEIGHBOUR_OFFSETS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 GOAL_COSTS = {
     TileType.RIDE:   0,
@@ -34,6 +35,9 @@ class FlowField:
 
     def recompute_for_food(self, grid):
         self._recompute_with_goals(grid, FOOD_GOAL_TILES)
+
+    def recompute_for_toilet(self, grid):
+        self._recompute_with_goals(grid, TOILET_GOAL_TILES)
 
     def recompute_for_exit(self, grid):
         self._recompute_with_goals(grid, EXIT_GOAL_TILES)

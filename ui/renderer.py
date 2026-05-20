@@ -8,8 +8,6 @@ from ui.colors import init_colors, PAIR_HUD, PAIR_HUD_POS, PAIR_HUD_NEG
 from ui.chars import TILE_CHARS, GUEST_CHARS
 from ui.constants import HUD_WIDTH, HUD_COL_OFFSET
 
-HUD_WIDTH = 22
-
 def _draw_map(stdscr, park):
     guest_positions = {
         (guest.row, guest.col): guest.state
@@ -50,10 +48,10 @@ def _draw_hud(stdscr, park, build_mode, place_mode):
 
     rows = [
         (2,  "PARKSIM",                           hud | curses.A_BOLD),
-        (4,  "FINANCES",                           hud | curses.A_UNDERLINE),
-        (5,  f"Cash:    ${park.finance.cash:.0f}", pos if park.finance.cash > 0 else neg),
-        (6,  f"Income:  ${park.finance.income_per_tick:.1f}/tick", pos),
-        (7,  f"Upkeep:  ${park.finance.upkeep_per_tick:.1f}/tick", neg),
+        (4,  "FINANCES",                                      hud | curses.A_UNDERLINE),
+        (5,  f"Cash:       ${park.finance.cash:.0f}",         pos if park.finance.cash > 0 else neg),
+        (6,  f"Pending:    ${park.finance.accumulated_income:.0f}", pos),
+        (7,  f"Settlement: {park.finance.seconds_until_next_settlement()}s", hud),
         (9,  "GUESTS",                             hud | curses.A_UNDERLINE),
         (10, f"Total:   {len(park.guests)}",       pos),
         (11, f"Hungry:  {hungry}",                 neg if hungry  > 0 else pos),
@@ -112,8 +110,11 @@ def _handle_input(key, park, paused, build_mode, place_mode, cursor_row, cursor_
     elif key == curses.KEY_RIGHT:
         cursor_col = min(PARK_WIDTH - 1, cursor_col + 1)
     elif key in (curses.KEY_ENTER, 10, 13):
-        if build_mode and park.get_tile(cursor_row, cursor_col) != TileType.ENTRANCE:
-            park.set_tile(cursor_row, cursor_col, place_mode)
+        if build_mode:
+            if place_mode == TileType.GRASS:
+                park.demolish_tile(cursor_row, cursor_col)
+            else:
+                park.place_tile(cursor_row, cursor_col, place_mode)
     return park, paused, build_mode, place_mode, cursor_row, cursor_col
 
 def _run(stdscr):

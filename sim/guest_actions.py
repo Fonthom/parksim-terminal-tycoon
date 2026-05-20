@@ -33,6 +33,9 @@ def find_food(guest, park):
 def find_toilet(guest, park):
     toilet_pos = find_adjacent_facility(guest, park, TileType.TOILET)
     if toilet_pos:
+        price = park.finance.toilet_price
+        guest.money -= price
+        park.finance.earn(price)
         guest.bladder = 0.0
         guest.bladder_rate = BLADDER_RATE
         guest.state = GuestState.WANDERING

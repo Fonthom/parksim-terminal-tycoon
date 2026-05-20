@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from .constants import (
     STARTING_CASH, INCOME_TICK_INTERVAL,
-    ENTRANCE_FEE, RIDE_PRICE, STALL_PRICE,
+    ENTRANCE_FEE, RIDE_PRICE, STALL_PRICE, TOILET_PRICE,
     UPKEEP_PER_RIDE, UPKEEP_PER_STALL, UPKEEP_PER_TOILET
 )
 
@@ -13,6 +13,7 @@ class Finance:
     entrance_fee: float       = ENTRANCE_FEE
     ride_price: float         = RIDE_PRICE
     stall_price: float        = STALL_PRICE
+    toilet_price: float       = TOILET_PRICE
 
     def game_tick(self, park):
         self.tick_counter += 1

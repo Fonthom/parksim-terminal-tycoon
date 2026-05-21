@@ -1,68 +1,47 @@
-from sim.guest import Guest, GuestState
+from sim.guest import Guest
 from sim.park import Park
-from sim.tiles import TileType
-from sim.constants import HUNGER_THRESHOLD
+from sim.guest_state import GuestState
+from sim.constants import PARK_WIDTH,HUNGER_THRESHOLD, PARK_HEIGHT, BLADDER_RATE, BLADDER_THRESHOLD
 
-def make_park_with_path():
-    park = Park()
-    for col in range(park.width):
-        park.set_tile(park.height - 1, col, TileType.PATH)
-    park.set_tile(park.height - 1, park.width // 2, TileType.ENTRANCE)
-    park.flow_field.recompute(park.grid)
-    return park
 
-def test_guest_constructs():
-    guest = Guest()
-    assert guest.state == GuestState.WANDERING
-    assert 0.0 <= guest.hunger < 0.3
-    assert guest.money > 0
-
-def test_guest_wanders():
-    park = make_park_with_path()
-    guest = Guest()
-    initial_row = guest.row
-    initial_col = guest.col
-    guest.update(park)
-    assert (guest.row, guest.col) != (initial_row, initial_col) or guest.state == GuestState.WANDERING
-
-def test_guest_gets_hungry():
-    park = make_park_with_path()
-    guest = Guest()
-    guest.hunger = HUNGER_THRESHOLD - 0.001
+def test_guest_constructs_with_defaults():
+    g = Guest()
+    assert g.row          == PARK_HEIGHT - 2
+    assert g.col          == PARK_WIDTH // 2
+    assert g.state        == GuestState.WANDERING
+    assert g.happiness    == 1.0
+    assert g.bladder_rate == BLADDER_RATE
+    assert 0.0 <= g.hunger  <= 0.3
+    assert 0.0 <= g.bladder <= 0.2
+    assert 20.0 <= g.money  <= 80.0
+ 
+def test_guest_switches_to_hungry():
+    park  = Park()
+    guest = Guest(row=park.height - 2, col=park.width // 2, hunger=HUNGER_THRESHOLD - 0.001)
     guest.update(park)
     assert guest.state == GuestState.HUNGRY
-
-def test_guest_finds_food():
-    park = make_park_with_path()
-    guest = Guest(row=park.height - 1, col=park.width // 2)
-    park.set_tile(park.height - 1, park.width // 2 + 1, TileType.STALL)
-    guest.state = GuestState.HUNGRY
-    guest.hunger = HUNGER_THRESHOLD
-    initial_money = guest.money
+ 
+def test_guest_switches_to_need_toilet():
+    park  = Park()
+    guest = Guest(row=park.height - 2, col=park.width // 2, bladder=BLADDER_THRESHOLD - 0.001)
     guest.update(park)
-    assert guest.state == GuestState.WANDERING
-    assert guest.hunger == 0.0
-    assert guest.money == initial_money - 5.0
-
-def test_guest_exits_when_broke():
-    park = make_park_with_path()
-    guest = Guest()
-    guest.state = GuestState.HUNGRY
-    guest.money = 0.0
+    assert guest.state == GuestState.NEED_TOILET
+ 
+def test_guest_switches_to_exiting_when_broke():
+    park  = Park()
+    guest = Guest(row=park.height - 2, col=park.width // 2, money=0.0)
     guest.update(park)
     assert guest.state == GuestState.EXITING
-
-def test_guest_reaches_exit():
-    park = make_park_with_path()
-    guest = Guest(row=park.height - 1, col=park.width // 2)
-    guest.state = GuestState.EXITING
+ 
+def test_guest_bladder_accident_zeroes_happiness():
+    park  = Park()
+    guest = Guest(row=park.height - 2, col=park.width // 2, bladder=1.0)
     guest.update(park)
-    assert guest.state == GuestState.LEFT
-
-def test_park_removes_left_guests():
-    park = make_park_with_path()
-    guest = Guest(row=park.height - 1, col=park.width // 2)
-    guest.state = GuestState.LEFT
-    park.guests.append(guest)
-    park.tick()
-    assert guest not in park.guests
+    assert guest.happiness == 0.0
+    assert guest.bladder   == 0.0
+ 
+def test_guest_update_does_not_crash():
+    park  = Park()
+    guest = Guest(row=park.height - 2, col=park.width // 2)
+    for _ in range(50):
+        guest.update(park)

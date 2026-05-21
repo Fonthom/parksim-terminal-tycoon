@@ -14,7 +14,7 @@ def ride(guest, park, ride_pos):
         return
     guest.money -= price
     park.finance.earn(price)
-    guest.happiness = min(1.0, guest.happiness + 0.2)
+    guest.happiness += 0.25
     guest.visited_rides.add(ride_pos)
     guest.target = None
 

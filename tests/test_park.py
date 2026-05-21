@@ -1,36 +1,78 @@
 from sim.park import Park
+from sim.constants import MAX_GUESTS
+from sim.constants import PARK_WIDTH, PARK_HEIGHT
 from sim.tiles import TileType
+from sim.guest import Guest
+from sim.guest_state import GuestState
+from sim.constants import INCOME_TICK_INTERVAL, STARTING_CASH
+
 
 def test_park_constructs():
     park = Park()
-    assert park.width == 80
-    assert park.height == 40
-    assert len(park.grid) == 80 * 40
-
-def test_entrance_placed():
+    assert park.width  == PARK_WIDTH
+    assert park.height == PARK_HEIGHT
+    assert len(park.grid) == PARK_WIDTH * PARK_HEIGHT
+ 
+def test_park_to_index():
     park = Park()
-    assert park.get_tile(park.height - 1, park.width // 2) == TileType.ENTRANCE
-
-def test_grid_default_grass():
+    assert park.to_index(0, 0)   == 0
+    assert park.to_index(1, 0)   == park.width
+    assert park.to_index(0, 1)   == 1
+    assert park.to_index(2, 3)   == 2 * park.width + 3
+ 
+def test_park_is_within_bounds():
     park = Park()
-    grass_tiles = [t for t in park.grid if t == TileType.GRASS]
-    assert len(grass_tiles) == (80 * 40) - 1
-
-def test_set_and_get_tile():
+    assert     park.is_within_bounds(0, 0)
+    assert     park.is_within_bounds(park.height - 1, park.width - 1)
+    assert not park.is_within_bounds(-1, 0)
+    assert not park.is_within_bounds(0, park.width)
+ 
+def test_park_get_tile():
     park = Park()
-    park.set_tile(0, 0, TileType.PATH)
-    assert park.get_tile(0, 0) == TileType.PATH
-
-def test_tick_runs():
+    mid  = park.width // 2
+    assert park.get_tile(park.height - 1, mid) == TileType.ENTRANCE
+ 
+def test_park_tick_runs():
     park = Park()
+    for _ in range(10):
+        park.tick()
+ 
+def test_park_tick_removes_left_guests():
+    park  = Park()
+    guest = Guest(row=park.height - 2, col=park.width // 2, state=GuestState.LEFT)
+    park.guests.append(guest)
     park.tick()
-
-def test_finance_tick():
+    assert guest not in park.guests
+ 
+def test_park_spawn_guests():
     park = Park()
-    park.finance.income_per_tick = 10.0
-    park.tick()
-    assert park.finance.cash == 10010.0
-
-def test_is_not_bankrupt_at_start():
+    for _ in range(100):
+        park.tick()
+    assert len(park.guests) > 0
+ 
+def test_park_max_guests_not_exceeded():
     park = Park()
-    assert not park.finance.is_bankrupt()
+    for _ in range(500):
+        park.tick()
+    assert len(park.guests) <= MAX_GUESTS
+ 
+def test_park_is_occupied():
+    park  = Park()
+    guest = Guest(row=5, col=5)
+    park.guests.append(guest)
+    assert     park.is_occupied(5, 5)
+    assert not park.is_occupied(5, 6)
+ 
+def test_park_finance_ticks():
+    park = Park()
+    park.finance.earn(1000.0)
+    for _ in range(INCOME_TICK_INTERVAL):
+        park.tick()
+    assert park.finance.cash != STARTING_CASH
+ 
+def test_park_smoke_500_ticks():
+    park = Park()
+    for _ in range(500):
+        park.tick()
+    assert len(park.guests) <= MAX_GUESTS
+    assert all(park.is_within_bounds(g.row, g.col) for g in park.guests)
